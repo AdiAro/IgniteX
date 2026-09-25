@@ -55,13 +55,38 @@ async function addNote(id, text) {
   });
 }
 
+const RATING_API_URL = 'https://ignitex-api.onrender.com/rate';
+
 /* ------------------------------------------------------------------
-   PLACEHOLDER SCORING FUNCTION
-   Replace the inside of this with a call to your friend's real rating
-   logic once you have it (e.g. fetch() to his API). Everything else —
-   forms, dashboard, leaderboard, countdown — stays the same.
+   Real AI scoring — calls the Python/Flask rating API you deployed.
+   Falls back to a simple local estimate only if the API can't be
+   reached (e.g. no internet), so a demo never hard-fails.
 ------------------------------------------------------------------- */
-function calculateIdeaScore(idea) {
+async function calculateIdeaScore(idea) {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 60000); // Render free tier can take ~50s to wake up
+    const res = await fetch(RATING_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: idea.title,
+        problem: idea.problem,
+        category: idea.category,
+        notesCount: (idea.notes || []).length
+      }),
+      signal: controller.signal
+    });
+    clearTimeout(timeout);
+    if (!res.ok) throw new Error('API returned ' + res.status);
+    return await res.json();
+  } catch (err) {
+    console.warn('Rating API unavailable, using local fallback score:', err);
+    return calculateIdeaScoreFallback(idea);
+  }
+}
+
+function calculateIdeaScoreFallback(idea) {
   const notesLen = (idea.notes || []).length;
   const seed = (idea.title.length * 7 + idea.problem.length * 3 + notesLen * 11) % 40;
   const base = 55 + seed;
@@ -99,7 +124,7 @@ function formatRemaining(ms) {
 // Scores an idea exactly once, writing the result back to Firestore.
 async function ensureScored(idea) {
   if (isReady(idea) && (idea.score === null || idea.score === undefined)) {
-    const s = calculateIdeaScore(idea);
+    const s = await calculateIdeaScore(idea);
     await updateDoc(doc(db, IDEAS_COL, idea.id), { score: s });
     return { ...idea, score: s };
   }
