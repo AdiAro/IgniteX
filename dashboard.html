@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>My ideas — Ignite X</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav>
+  <div class="logo">Ignite<span>X</span></div>
+  <div class="links">
+    <a href="index.html">Home</a>
+    <a href="submit.html">Submit an idea</a>
+    <a href="dashboard.html">My ideas</a>
+  </div>
+</nav>
+
+<main class="page wrap">
+  <h1 style="font-size:1.8rem">My ideas</h1>
+  <div id="list" class="card"><div class="loading">Loading your ideas...</div></div>
+
+  <p class="demo-note">
+    Showing this to your evaluator? Real ideas take 2 days to score. Use "Reveal now"
+    on any idea to skip the wait for a demo — it's for presentation only.<br>
+    Note: "My ideas" only shows ideas submitted from this device/browser.
+  </p>
+</main>
+
+<script type="module">
+import {
+  getMyIdeas, ensureScored, isReady, msRemaining, formatRemaining,
+  overallScore, addNote, demoRevealNow
+} from './app.js';
+
+function escapeHtml(str) {
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+async function render() {
+  const list = document.getElementById('list');
+  let ideas = await getMyIdeas();
+  ideas = await Promise.all(ideas.map(ensureScored));
+
+  if (ideas.length === 0) {
+    list.innerHTML = `<div class="empty">No ideas yet. <a href="submit.html">Submit your first one</a>.</div>`;
+    return;
+  }
+
+  list.innerHTML = ideas.map(idea => {
+    const ready = isReady(idea);
+    const statusTag = ready
+      ? `<span class="tag ready">Score ready</span>`
+      : `<span class="tag researching">Researching</span>`;
+
+    const notesHtml = (idea.notes || []).map(n => `
+      <div class="note">${escapeHtml(n.text)}<time>${new Date(n.at).toLocaleString()}</time></div>
+    `).join('');
+
+    let scoreHtml = '';
+    if (ready && idea.score) {
+      const s = idea.score;
+      scoreHtml = `
+        <div class="overall"><div class="num">${overallScore(s)}</div><div class="label">Overall score</div></div>
+        <div class="score-grid">
+          <div class="score-item"><div class="num">${s.feasibility}</div><div class="label">Feasibility</div></div>
+          <div class="score-item"><div class="num">${s.originality}</div><div class="label">Originality</div></div>
+          <div class="score-item"><div class="num">${s.impact}</div><div class="label">Impact</div></div>
+          <div class="score-item"><div class="num">${s.researchDepth}</div><div class="label">Research depth</div></div>
+          <div class="score-item"><div class="num">${s.clarity}</div><div class="label">Clarity</div></div>
+        </div>`;
+    }
+
+    return `
+      <div class="idea" data-id="${idea.id}">
+        <div class="idea-top">
+          <h3>${escapeHtml(idea.title)}</h3>
+          ${statusTag}
+        </div>
+        <p class="problem">${escapeHtml(idea.problem)}</p>
+        ${!ready ? `<div class="countdown">${formatRemaining(msRemaining(idea))} &middot; ${idea.category}</div>` : `<div class="countdown">${idea.category}</div>`}
+
+        ${scoreHtml}
+
+        <div class="idea-actions">
+          ${!ready ? `<button class="btn ghost" data-action="reveal" data-id="${idea.id}">Reveal now (demo)</button>` : ''}
+          <button class="btn ghost" data-action="toggle" data-id="${idea.id}">Research notes (${(idea.notes||[]).length})</button>
+        </div>
+
+        <div id="notes-${idea.id}" style="display:none;margin-top:14px">
+          ${notesHtml || '<p style="color:var(--slate);font-size:.9rem">No notes yet.</p>'}
+          <div style="margin-top:10px;display:flex;gap:8px">
+            <input id="noteInput-${idea.id}" placeholder="What did you find out today?">
+            <button class="btn" data-action="addnote" data-id="${idea.id}">Add</button>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+document.getElementById('list').addEventListener('click', async (e) => {
+  const btn = e.target.closest('button[data-action]');
+  if (!btn) return;
+  const id = btn.dataset.id;
+  const action = btn.dataset.action;
+
+  if (action === 'toggle') {
+    const el = document.getElementById('notes-' + id);
+    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  } else if (action === 'reveal') {
+    btn.disabled = true;
+    await demoRevealNow(id);
+    await render();
+  } else if (action === 'addnote') {
+    const input = document.getElementById('noteInput-' + id);
+    const text = input.value.trim();
+    if (!text) return;
+    btn.disabled = true;
+    await addNote(id, text);
+    await render();
+  }
+});
+
+render();
+setInterval(render, 60000);
+</script>
+</body>
+</html>

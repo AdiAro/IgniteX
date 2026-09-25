@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Submit an idea — Ignite X</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav>
+  <div class="logo">Ignite<span>X</span></div>
+  <div class="links">
+    <a href="index.html">Home</a>
+    <a href="submit.html">Submit an idea</a>
+    <a href="dashboard.html">My ideas</a>
+  </div>
+</nav>
+
+<main class="page wrap" style="max-width:640px">
+  <h1 style="font-size:1.8rem">Submit your idea</h1>
+  <p style="color:var(--slate);margin-top:10px">Once submitted, your idea enters research mode. Scoring unlocks after 2 days.</p>
+
+  <div class="card">
+    <form id="ideaForm">
+      <label for="name">Your name</label>
+      <input id="name" required placeholder="e.g. Aditya Sharma">
+
+      <label for="className">Class &amp; section</label>
+      <input id="className" required placeholder="e.g. 11-B">
+
+      <label for="title">Idea title</label>
+      <input id="title" required placeholder="e.g. A low-cost water filter for rural schools">
+
+      <label for="category">Area / field</label>
+      <select id="category" required>
+        <option value="">Select an area</option>
+        <option>Environment &amp; Sustainability</option>
+        <option>Health &amp; Wellbeing</option>
+        <option>Technology &amp; Engineering</option>
+        <option>Education</option>
+        <option>Social Impact</option>
+        <option>Business &amp; Economics</option>
+        <option>Other</option>
+      </select>
+
+      <label for="problem">What problem does it solve, and how?</label>
+      <textarea id="problem" required placeholder="Describe the problem and your proposed idea..."></textarea>
+
+      <div style="margin-top:22px">
+        <button type="submit" class="btn" id="submitBtn">Submit idea</button>
+      </div>
+    </form>
+  </div>
+</main>
+
+<script type="module">
+  import { addIdea } from './app.js';
+
+  document.getElementById('ideaForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.textContent = 'Submitting...';
+    try {
+      await addIdea({
+        name: document.getElementById('name').value.trim(),
+        className: document.getElementById('className').value.trim(),
+        title: document.getElementById('title').value.trim(),
+        category: document.getElementById('category').value,
+        problem: document.getElementById('problem').value.trim()
+      });
+      window.location.href = 'dashboard.html';
+    } catch (err) {
+      alert('Something went wrong submitting your idea. Please check your internet connection and try again.');
+      btn.disabled = false;
+      btn.textContent = 'Submit idea';
+      console.error(err);
+    }
+  });
+</script>
+</body>
+</html>

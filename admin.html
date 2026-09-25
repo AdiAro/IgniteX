@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Leaderboard — Ignite X</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav>
+  <div class="logo">Ignite<span>X</span></div>
+  <div class="links">
+    <a href="index.html">Home</a>
+    <a href="submit.html">Submit an idea</a>
+    <a href="dashboard.html">My ideas</a>
+  </div>
+</nav>
+
+<div id="gate" class="gate">
+  <h1 style="font-size:1.4rem">Teacher / organiser access</h1>
+  <p style="color:var(--slate);margin:14px 0">Enter the event PIN to view the leaderboard.</p>
+  <input id="pin" type="password" placeholder="PIN" style="margin-bottom:14px">
+  <button class="btn" id="pinBtn" style="width:100%">Unlock</button>
+</div>
+
+<main class="page wrap" id="board" style="display:none">
+  <h1 style="font-size:1.8rem">Leaderboard</h1>
+  <p style="color:var(--slate)">All submitted ideas, ranked by overall score. Ideas still in their 2-day research window show as pending.</p>
+  <div id="list" class="card"><div class="loading">Loading all submissions...</div></div>
+</main>
+
+<script type="module">
+import { getAllIdeas, ensureScored, isReady, overallScore } from './app.js';
+
+// NOTE: This is a simple presentation-layer PIN, not real security —
+// good enough to keep casual visitors out for a school event, not a
+// replacement for proper Firestore security rules.
+const EVENT_PIN = 'ignite2026';
+
+function escapeHtml(str) {
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+async function renderBoard() {
+  const list = document.getElementById('list');
+  let ideas = await getAllIdeas();
+  ideas = await Promise.all(ideas.map(ensureScored));
+
+  const scored = ideas.filter(i => isReady(i) && i.score)
+    .sort((a, b) => overallScore(b.score) - overallScore(a.score));
+  const pending = ideas.filter(i => !(isReady(i) && i.score));
+
+  let html = '';
+  if (scored.length === 0) {
+    html += `<div class="empty">No scored ideas yet.</div>`;
+  } else {
+    html += scored.map((idea, i) => `
+      <div class="rank">
+        <div style="display:flex;align-items:center;gap:14px">
+          <div class="pos">#${i + 1}</div>
+          <div>
+            <div>${escapeHtml(idea.title)}</div>
+            <div class="who">${escapeHtml(idea.name || 'Unknown')} · ${escapeHtml(idea.className || '')} · ${escapeHtml(idea.category || '')}</div>
+          </div>
+        </div>
+        <div class="sc">${overallScore(idea.score)}</div>
+      </div>`).join('');
+  }
+
+  if (pending.length > 0) {
+    html += `<h3 style="margin-top:30px;font-size:1rem;color:var(--slate)">Still in research window (${pending.length})</h3>`;
+    html += pending.map(idea => `
+      <div class="rank">
+        <div class="who">${escapeHtml(idea.title)} — ${escapeHtml(idea.name || 'Unknown')}, ${escapeHtml(idea.className || '')}</div>
+        <span class="tag researching">Researching</span>
+      </div>`).join('');
+  }
+
+  list.innerHTML = html;
+}
+
+document.getElementById('pinBtn').addEventListener('click', () => {
+  if (document.getElementById('pin').value === EVENT_PIN) {
+    document.getElementById('gate').style.display = 'none';
+    document.getElementById('board').style.display = 'block';
+    renderBoard();
+    setInterval(renderBoard, 30000);
+  } else {
+    alert('Incorrect PIN.');
+  }
+});
+</script>
+</body>
+</html>
